@@ -1,0 +1,29 @@
+sudo: required
+dist: trusty
+
+language: c
+
+compiler:
+# - clang
+ - gcc
+
+install: 
+ - if [ "$CC" = "gcc" ]; then export CC="gcc-6"; fi 
+ - if [ "$CC" = "clang" ]; then export CC="clang-3.7"; fi 
+
+script:
+ - ruby glcp.rb
+# - make --directory=compiler CC="${CC}" version all test
+
+addons:
+ apt:
+  sources:
+   - ubuntu-toolchain-r-test
+   - llvm-toolchain-precise-3.7 
+   - llvm-toolchain-precise 
+  packages:
+   - make
+   - gcc-6
+   - clang-3.7
+   - libc6
+   - libgcc1
