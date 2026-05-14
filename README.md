@@ -9,7 +9,7 @@ When a valid official `glcorearb.h` is supplied, `glcp` version follows:
 - Example: OpenGL `2.1` => glcp `2.1.0`
 
 ## Local generation
-1. Download official `glcorearb.h` from <https://www.opengl.org/registry/>.
+1. Download official `glcorearb.h` from <https://registry.khronos.org/OpenGL/api/GL/glcorearb.h>.
 2. Place it at `gl/glcorearb.h`.
 3. Run:
 
@@ -60,7 +60,7 @@ void function(HDC dc) {
 - `LICENSE.txt`
 
 ## Tooltips
-- **Generation source**: "Use OpenGL Registry `glcorearb.h` to keep generated bindings current."
+- **Generation source**: "Use Khronos OpenGL Registry `glcorearb.h` to keep generated bindings current."
 - **Initialization timing**: "Call `glcpInitialize()` only after `wglMakeCurrent` succeeds."
 - **Version policy**: "glcp version tracks OpenGL major/minor; patch number is glcp release."
 

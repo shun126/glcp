@@ -4,8 +4,8 @@ set -euo pipefail
 mkdir -p gl
 
 URLS=(
-  "https://www.opengl.org/registry/api/GL/glcorearb.h"
   "https://registry.khronos.org/OpenGL/api/GL/glcorearb.h"
+  "https://www.opengl.org/registry/api/GL/glcorearb.h"
   "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/main/api/GL/glcorearb.h"
 )
 
@@ -33,3 +33,4 @@ for p in [Path('gl/glcorearb.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]:
     t = t.replace('\r\n','\n').replace('\r','\n')
     p.write_text(t.replace('\n','\r\n'), encoding='utf-8', newline='')
 PY
+
