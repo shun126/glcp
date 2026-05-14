@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 mkdir -p dist
 version="$(date -u +%Y%m%d)"

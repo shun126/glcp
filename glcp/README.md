@@ -1,12 +1,18 @@
 # glcp Usage Guide
 
-`glcp.c` and `glcp.h` provide runtime loading for OpenGL core-profile functions on Windows.
+`glcp.c` and `glcp.h` are the runtime loader portion of the `glcp` project. They provide generated OpenGL core-profile declarations together with function loading for projects that use WGL on Windows.
 
-## What this does
+## What this provides
 
-- Declares OpenGL function pointers in `glcp.h`
-- Resolves each pointer in `glcpInitialize()` using `wglGetProcAddress`
-- Provides `glcpFinalize()` as a cleanup hook (currently no-op)
+- OpenGL declarations generated from Khronos `glcorearb.h`
+- Function pointer definitions in `glcp.c`
+- Runtime resolution in `glcpInitialize()` through `wglGetProcAddress`
+- `glcpFinalize()` as a cleanup hook
+
+## Platform notes
+
+- The repository generation workflow can run outside Windows, including Linux environments.
+- The generated loader itself currently targets Windows runtime integration through `windows.h` and `wglGetProcAddress`.
 
 ## Integration steps
 
@@ -21,7 +27,7 @@
 ```
 
 3. Create and make current a valid OpenGL rendering context.
-4. Call `glcpInitialize()` **after** the context is current.
+4. Call `glcpInitialize()` after the context is current.
 5. Use OpenGL core-profile APIs through the loaded function pointers.
 6. Optionally call `glcpFinalize()` before application shutdown.
 
@@ -48,11 +54,13 @@ void InitGL(HDC dc)
 
 - `glcpInitialize()` must run on a thread with a current OpenGL context.
 - If you recreate the context, call `glcpInitialize()` again.
-- This project targets Windows (`windows.h`, `wglGetProcAddress`).
-- Supported OpenGL and glcp versions are documented in the repository root README and CHANGELOG.
+- Supported OpenGL and `glcp` versions are documented in the repository root `README.md` and `CHANGELOG.md`.
 
 ## Tooltips
 
 - **Initialize timing**: "Call `glcpInitialize()` only after `wglMakeCurrent` succeeds."
 - **Context lifecycle**: "If the OpenGL context changes, re-run `glcpInitialize()`."
-- **Platform scope**: "This loader uses WGL and is intended for Windows builds."
+- **Runtime scope**: "This generated loader currently uses WGL for Windows OpenGL contexts."
+
+---
+Shun Moriya http://mnu.sakura.ne.jp

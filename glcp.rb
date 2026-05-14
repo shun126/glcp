@@ -6,7 +6,7 @@
 
 require 'mkmf'
 
-GLCP_RELEASE = 2
+DEFAULT_GLCP_RELEASE = 3
 GLCP_GENERATE_TIME = Time.now
 CURRENT_STAGE = { name: 'startup' }
 
@@ -74,9 +74,19 @@ def detect_supported_gl_version(path)
 	versions.max
 end
 
+def detect_glcp_release
+	value = ENV['GLCP_RELEASE']
+	return DEFAULT_GLCP_RELEASE if value.nil? || value.strip.empty?
+
+	Integer(value, 10)
+rescue ArgumentError
+	raise "invalid GLCP_RELEASE value: #{value.inspect}"
+end
+
 log_stage('detecting supported OpenGL version from gl/glcorearb.h')
 SUPPORTED_GL_MAJOR, SUPPORTED_GL_MINOR = detect_supported_gl_version('gl/glcorearb.h')
 SUPPORTED_GL_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}"
+GLCP_RELEASE = detect_glcp_release
 GLCP_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}.#{GLCP_RELEASE}"
 puts "[glcp] detected OpenGL #{SUPPORTED_GL_VERSION}, generator version #{GLCP_VERSION}"
 
@@ -255,8 +265,9 @@ begin
 			dest.puts HEADER
 			dest.puts '#if !defined(___GL_CORE_PROFILE_H___)'
 			dest.puts '#define ___GL_CORE_PROFILE_H___'
+			dest.puts '#include <KHR/khrplatform.h>'
 			dest.puts '#include <windows.h>'
-			dest.puts '#include <gl/gl.h>'
+			dest.puts '#include <GL/gl.h>'
 			dest.puts '#if defined(GL_VERSION_1_1) && !defined(GL_VERSION_1_0)'
 			dest.puts '#define GL_VERSION_1_0'
 			dest.puts '#endif'

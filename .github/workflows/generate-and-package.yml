@@ -1,4 +1,4 @@
-name: Generate glcp and Package
+name: Generate glcp and Release
 
 on:
   workflow_dispatch:
@@ -11,6 +11,10 @@ on:
       - '.github/workflows/generate-and-package.yml'
       - '.github/scripts/**'
 
+concurrency:
+  group: generate-and-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -21,33 +25,75 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
 
-      - name: Install MinGW build tools
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64
+          sudo apt-get install -y mingw-w64 zip
 
-      - name: Generate from OpenGL Registry (scheduled/manual)
-        if: github.event_name != 'push'
+      - name: Download latest glcorearb.h
         run: bash .github/scripts/generate_from_registry.sh
 
-      - name: Generate glcp sources (push events)
-        if: github.event_name == 'push'
+      - name: Detect version and next patch
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          version_info="$(ruby - <<'RUBY'
+          versions = []
+          File.foreach('gl/glcorearb.h') do |line|
+            if /#ifndef\sGL_VERSION_([0-9]+)_([0-9]+)/ =~ line
+              versions << [$1.to_i, $2.to_i]
+            end
+          end
+          major, minor = versions.empty? ? [0, 0] : versions.max
+          puts "#{major}.#{minor}"
+          RUBY
+          )"
+
+          major="${version_info%%.*}"
+          minor="${version_info##*.}"
+          prefix="v${major}.${minor}."
+          next_patch="$(git tag --list "${prefix}*" | sed -E "s/^v${major}\.${minor}\.//" | awk '/^[0-9]+$/ { if ($1 > max) max = $1 } END { print max + 1 }')"
+          if [ -z "$next_patch" ]; then
+            next_patch=1
+          fi
+
+          glcp_version="${major}.${minor}.${next_patch}"
+          tag_name="v${glcp_version}"
+
+          {
+            echo "major=${major}"
+            echo "minor=${minor}"
+            echo "patch=${next_patch}"
+            echo "glcp_version=${glcp_version}"
+            echo "tag_name=${tag_name}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate glcp sources
+        env:
+          GLCP_RELEASE: ${{ steps.version.outputs.patch }}
         run: ruby glcp.rb
 
       - name: Update changelog entry
+        env:
+          GLCP_VERSION: ${{ steps.version.outputs.glcp_version }}
         run: bash .github/scripts/update_changelog.sh
 
       - name: Normalize text files to UTF-8 + CRLF
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]
+          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('gl/glcorearb.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]
           for p in targets:
               if not p.exists():
                   continue
@@ -56,23 +102,106 @@ jobs:
               p.write_text(text.replace('\n', '\r\n'), encoding='utf-8', newline='')
           PY
 
-      - name: Commit generated files and changelog (if changed)
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: 'chore: update glcorearb-derived files and changelog'
-          file_pattern: gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md
+      - name: Detect tracked changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md)
+          if git diff --quiet -- "${files[@]}"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build distribution archive
+        if: steps.changes.outputs.changed == 'true'
         run: bash .github/scripts/package_dist.sh
 
       - name: Upload distribution artifact
+        if: steps.changes.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: glcp-dist
           path: dist/*.zip
 
-      - name: Publish release asset (tag runs)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.zip
+      - name: Commit generated files
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md
+          git commit -m "chore: release glcp ${{ steps.version.outputs.glcp_version }}"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Verify release tag is unused
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_name="${{ steps.version.outputs.tag_name }}"
+          if git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null; then
+            echo "Tag ${tag_name} already exists locally." >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag_name}" >/dev/null 2>&1; then
+            echo "Tag ${tag_name} already exists on origin." >&2
+            exit 1
+          fi
+
+      - name: Prepare release notes
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          changelog = Path('CHANGELOG.md').read_text(encoding='utf-8', errors='replace').replace('\r\n', '\n').replace('\r', '\n')
+          lines = changelog.split('\n')
+          entry = []
+          in_entry = False
+          for line in lines:
+              if line.startswith('## '):
+                  if in_entry:
+                      break
+                  in_entry = True
+              if in_entry:
+                  entry.append(line)
+
+          if entry:
+              body = '\n'.join(entry).strip()
+          else:
+              version = "${{ steps.version.outputs.glcp_version }}"
+              body = (
+                  f"## version {version}\n"
+                  "- Updated `gl/glcorearb.h` from OpenGL Registry.\n"
+                  "- Regenerated `glcp/glcp.c` and `glcp/glcp.h`.\n"
+                  f"- Supported OpenGL version: `${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}`."
+              )
+
+          Path('release-notes.md').write_text(body + '\n', encoding='utf-8', newline='\n')
+          PY
+          echo "path=release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag "${{ steps.version.outputs.tag_name }}"
+          git push origin "${{ steps.version.outputs.tag_name }}"
+
+      - name: Create GitHub release
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.version.outputs.tag_name }}" dist/*.zip \
+            --title "glcp ${{ steps.version.outputs.glcp_version }}" \
+            --notes-file "${{ steps.notes.outputs.path }}"

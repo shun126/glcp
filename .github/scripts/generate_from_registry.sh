@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 mkdir -p gl
 
@@ -22,15 +21,12 @@ if [ "$downloaded" -ne 1 ]; then
   exit 1
 fi
 
-ruby glcp.rb
-
 python3 - <<'PY'
 from pathlib import Path
-for p in [Path('gl/glcorearb.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]:
+for p in [Path('gl/glcorearb.h')]:
     if not p.exists():
         continue
     t = p.read_text(encoding='utf-8', errors='replace')
     t = t.replace('\r\n','\n').replace('\r','\n')
     p.write_text(t.replace('\n','\r\n'), encoding='utf-8', newline='')
 PY
-
