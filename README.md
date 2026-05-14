@@ -17,6 +17,8 @@ When a valid official `glcorearb.h` is supplied, `glcp` version follows:
 ruby glcp.rb
 ```
 
+The generator also performs a compile check for `glcp/glcp.c` when a supported C compiler is available.
+
 ### One-step generation from OpenGL Registry
 ```bash
 bash .github/scripts/generate_from_registry.sh
@@ -46,6 +48,7 @@ void function(HDC dc) {
 - `schedule`: weekly execution
 - download latest official `glcorearb.h`
 - regenerate `glcp/glcp.c` and `glcp/glcp.h`
+- compile-check generated `glcp/glcp.c`
 - update `CHANGELOG.md`
 - auto-commit generated changes when detected
 - package distribution ZIP and upload artifact
@@ -56,7 +59,7 @@ void function(HDC dc) {
 
 - `glcp/glcp.c`
 - `glcp/glcp.h`
-- `README.md`
+- `glcp/README.md`
 - `LICENSE.txt`
 
 ## Tooltips
