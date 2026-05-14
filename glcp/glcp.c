@@ -1,8 +1,9 @@
 /*
  * glcp
- * version 0.0.0
+ * version 0.0.2
  * supported OpenGL version 0.0
  *
+ * The zlib/libpng License
  * Copyright (C) 2013-2026 Shun Moriya
  *
  * This software is provided 'as-is', without any express or implied
@@ -21,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-05-14 16:32:28
+ * generate from glcp.rb at 2026-05-14 16:51:57
  */
 
 #include "glcp.h"
