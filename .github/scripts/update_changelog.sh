@@ -13,7 +13,17 @@ ${header}
 ${body}
 EOF
 else
-  if ! rg -F "${header}" CHANGELOG.md >/dev/null; then
+  if command -v rg >/dev/null 2>&1; then
+    has_header() {
+      rg -F "${header}" CHANGELOG.md >/dev/null
+    }
+  else
+    has_header() {
+      grep -F "${header}" CHANGELOG.md >/dev/null
+    }
+  fi
+
+  if ! has_header; then
     tmp="$(mktemp)"
     {
       echo "# CHANGELOG"

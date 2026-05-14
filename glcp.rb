@@ -4,7 +4,7 @@
 # glMultiTexCoord2fARB = (PFNGLMULTITEXCOORD2FARBPROC)wglGetProcAddress("glMultiTexCoord2fARB");
 # if(!glMultiTexCoord2fARB)return 1;
 
-GLCP_RELEASE = 0
+GLCP_RELEASE = 2
 GLCP_GENERATE_TIME = Time.now
 
 def detect_supported_gl_version(path)
@@ -30,6 +30,7 @@ HEADER = <<"EOS"
  * version #{GLCP_VERSION}
  * supported OpenGL version #{SUPPORTED_GL_VERSION}
  *
+ * The zlib/libpng License
  * Copyright (C) 2013-#{GLCP_GENERATE_TIME.strftime("%Y")} Shun Moriya
  *
  * This software is provided 'as-is', without any express or implied
