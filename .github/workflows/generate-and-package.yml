@@ -1,0 +1,71 @@
+name: Generate glcp and Package
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+  push:
+    paths:
+      - 'gl/glcorearb.h'
+      - 'glcp.rb'
+      - '.github/workflows/generate-and-package.yml'
+      - '.github/scripts/**'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Generate from OpenGL Registry (scheduled/manual)
+        if: github.event_name != 'push'
+        run: bash .github/scripts/generate_from_registry.sh
+
+      - name: Generate glcp sources (push events)
+        if: github.event_name == 'push'
+        run: ruby glcp.rb
+
+      - name: Update changelog entry
+        run: bash .github/scripts/update_changelog.sh
+
+      - name: Normalize text files to UTF-8 + CRLF
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]
+          for p in targets:
+              if not p.exists():
+                  continue
+              text = p.read_text(encoding='utf-8', errors='replace')
+              text = text.replace('\r\n', '\n').replace('\r', '\n')
+              p.write_text(text.replace('\n', '\r\n'), encoding='utf-8', newline='')
+          PY
+
+      - name: Commit generated files and changelog (if changed)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: update glcorearb-derived files and changelog'
+          file_pattern: gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md
+
+      - name: Build distribution archive
+        run: bash .github/scripts/package_dist.sh
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glcp-dist
+          path: dist/*.zip
+
+      - name: Publish release asset (tag runs)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip

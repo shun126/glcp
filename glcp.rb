@@ -4,13 +4,31 @@
 # glMultiTexCoord2fARB = (PFNGLMULTITEXCOORD2FARBPROC)wglGetProcAddress("glMultiTexCoord2fARB");
 # if(!glMultiTexCoord2fARB)return 1;
 
-GLCP_VERSION = '0.0.2'
+GLCP_RELEASE = 0
 GLCP_GENERATE_TIME = Time.now
+
+def detect_supported_gl_version(path)
+	versions = []
+	File.open(path){|file|
+		file.each{|line|
+			if /\#ifndef\sGL_VERSION_([0-9]+)_([0-9]+)/ =~ line then
+				versions << [$1.to_i, $2.to_i]
+			end
+		}
+	}
+	return [0, 0] if versions.empty?
+	versions.max
+end
+
+SUPPORTED_GL_MAJOR, SUPPORTED_GL_MINOR = detect_supported_gl_version('gl/glcorearb.h')
+SUPPORTED_GL_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}"
+GLCP_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}.#{GLCP_RELEASE}"
 
 HEADER = <<"EOS"
 /*
  * glcp
  * version #{GLCP_VERSION}
+ * supported OpenGL version #{SUPPORTED_GL_VERSION}
  *
  * Copyright (C) 2013-#{GLCP_GENERATE_TIME.strftime("%Y")} Shun Moriya
  *
@@ -94,7 +112,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	file.puts '#include "glcp.h"'
 
 	################################################################################
-	# 関数ポインター変数を出力
+	# Output function pointer variables
 	################################################################################
 	last_output_version = ''
 	prototypes.each{|prototype, function|
@@ -111,7 +129,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	end
 =begin
 	################################################################################
-	# 関数を出力
+	# Output function wrappers
 	################################################################################
 	last_output_version = ''
 	prototypes.each{|prototype, function|
@@ -139,7 +157,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	end
 =end
 	################################################################################
-	# 初期化関数を出力
+	# Output initialization function
 	################################################################################
 	file.puts 'void glcpInitialize()'
 	file.puts '{'
@@ -161,7 +179,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	file.puts '}'
 
 	################################################################################
-	# 終了関数を出力
+	# Output finalization function
 	################################################################################
 	file.puts 'void glcpFinalize()'
 	file.puts '{'
@@ -189,7 +207,7 @@ open("gl/glcorearb.h") {|source|
 		dest.puts '#endif'
 
 		################################################################################
-		# バージョンシンボルを出力
+		# Output version symbols
 		################################################################################
 		last_output_version = ''
 		functions.each{|function, version|
@@ -205,7 +223,7 @@ open("gl/glcorearb.h") {|source|
 		end
 
 		################################################################################
-		# glcorearb.hを出力
+		# Embed glcorearb.h contents
 		################################################################################
 		dest.puts '/* <-- glcorearb.h */'
 		dest.write(source.read)
@@ -215,7 +233,7 @@ open("gl/glcorearb.h") {|source|
 		dest.puts '#endif'
 #=begin
 		################################################################################
-		# 関数ポインター変数を出力
+		# Output function pointer variables
 		################################################################################
 		last_output_version = ''
 		prototypes.each{|prototype, function|
@@ -232,7 +250,7 @@ open("gl/glcorearb.h") {|source|
 		end
 #=end
 		################################################################################
-		# プロトタイプ宣言を出力
+		# Output prototype declarations
 		################################################################################
 		dest.puts 'extern void glcpInitialize();'
 		dest.puts 'extern void glcpFinalize();'
