@@ -4,14 +4,99 @@
 # glMultiTexCoord2fARB = (PFNGLMULTITEXCOORD2FARBPROC)wglGetProcAddress("glMultiTexCoord2fARB");
 # if(!glMultiTexCoord2fARB)return 1;
 
-GLCP_VERSION = '0.0.2'
+require 'mkmf'
+
+DEFAULT_GLCP_RELEASE = 3
 GLCP_GENERATE_TIME = Time.now
+CURRENT_STAGE = { name: 'startup' }
+
+def log_stage(message)
+	CURRENT_STAGE[:name] = message
+	puts "[glcp] #{message}"
+	$stdout.flush
+end
+
+def run_command(command)
+	puts "[glcp] running: #{command}"
+	success = system(command)
+	status = $?.exitstatus if $?
+	puts "[glcp] command exit status: #{status.nil? ? 'unknown' : status}"
+	success
+end
+
+def detect_build_check_command
+	commands = [
+		['x86_64-w64-mingw32-gcc', 'x86_64-w64-mingw32-gcc -c -I. -o /dev/null glcp/glcp.c'],
+		['i686-w64-mingw32-gcc', 'i686-w64-mingw32-gcc -c -I. -o /dev/null glcp/glcp.c'],
+		['clang', 'clang --target=x86_64-w64-windows-gnu -c -I. -o /dev/null glcp/glcp.c'],
+		['gcc', 'gcc -c -I. -o /dev/null glcp/glcp.c'],
+		['cc', 'cc -c -I. -o /dev/null glcp/glcp.c']
+	]
+
+	commands.each do |executable, command|
+		return [executable, command] if find_executable(executable)
+	end
+
+	return ['cl', 'cl /nologo /c /I. /TC /FoNUL glcp\\glcp.c'] if find_executable('cl')
+
+	nil
+end
+
+def run_build_check
+	log_stage('building generated glcp/glcp.c')
+	detected = detect_build_check_command
+	if detected.nil?
+		message = 'no supported C compiler found for build check'
+		if ENV['GLCP_BUILD_CHECK_REQUIRED'] == '1'
+			raise message
+		end
+		puts "[glcp] skipped build check: #{message}"
+		return
+	end
+
+	compiler, command = detected
+	puts "[glcp] build check compiler: #{compiler}"
+	success = run_command(command)
+	raise "build check failed with #{compiler}" unless success
+	puts '[glcp] build check passed'
+end
+
+def detect_supported_gl_version(path)
+	versions = []
+	File.open(path){|file|
+		file.each{|line|
+			if /\#ifndef\sGL_VERSION_([0-9]+)_([0-9]+)/ =~ line then
+				versions << [$1.to_i, $2.to_i]
+			end
+		}
+	}
+	return [0, 0] if versions.empty?
+	versions.max
+end
+
+def detect_glcp_release
+	value = ENV['GLCP_RELEASE']
+	return DEFAULT_GLCP_RELEASE if value.nil? || value.strip.empty?
+
+	Integer(value, 10)
+rescue ArgumentError
+	raise "invalid GLCP_RELEASE value: #{value.inspect}"
+end
+
+log_stage('detecting supported OpenGL version from gl/glcorearb.h')
+SUPPORTED_GL_MAJOR, SUPPORTED_GL_MINOR = detect_supported_gl_version('gl/glcorearb.h')
+SUPPORTED_GL_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}"
+GLCP_RELEASE = detect_glcp_release
+GLCP_VERSION = "#{SUPPORTED_GL_MAJOR}.#{SUPPORTED_GL_MINOR}.#{GLCP_RELEASE}"
+puts "[glcp] detected OpenGL #{SUPPORTED_GL_VERSION}, generator version #{GLCP_VERSION}"
 
 HEADER = <<"EOS"
 /*
  * glcp
  * version #{GLCP_VERSION}
+ * supported OpenGL version #{SUPPORTED_GL_VERSION}
  *
+ * The zlib/libpng License
  * Copyright (C) 2013-#{GLCP_GENERATE_TIME.strftime("%Y")} Shun Moriya
  *
  * This software is provided 'as-is', without any express or implied
@@ -56,45 +141,50 @@ functions = {}
 prototypes = {}
 hoge = {}
 
-File.open('gl/glcorearb.h'){|file|
-	version = 'GL_VERSION_0_0'
-	file.each{|line|
-		if /\#ifndef\s(GL_VERSION_[0-9|_]+)/ =~ line then
-			version = $1
-		end
-
-		#if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)\s(\([0-9|a-z|A-Z|_*,.\s]+\));/ =~ line then
-		if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)/ =~ line then
-			functions[$2] = version
-=begin
-			position = line.rindex(';')
-			puts $1 + ' ' + $2 + ' ' + $3
-			if position != nil then
-				hoge[$2] = line.slice(0, position)
+begin
+	log_stage('parsing gl/glcorearb.h for functions and prototypes')
+	File.open('gl/glcorearb.h'){|file|
+		version = 'GL_VERSION_0_0'
+		file.each{|line|
+			if /\#ifndef\s(GL_VERSION_[0-9|_]+)/ =~ line then
+				version = $1
 			end
-			hoge[$2] = Function.new($1, $2, $3)
+
+			#if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)\s(\([0-9|a-z|A-Z|_*,.\s]+\));/ =~ line then
+			if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)/ =~ line then
+				functions[$2] = version
+=begin
+				position = line.rindex(';')
+				puts $1 + ' ' + $2 + ' ' + $3
+				if position != nil then
+					hoge[$2] = line.slice(0, position)
+				end
+				hoge[$2] = Function.new($1, $2, $3)
 =end
-		end
+			end
 
-		if /typedef\s[0-9|a-z|A-Z|_]+\s\(APIENTRYP\s([0-9|a-z|A-Z|_]+)/ =~ line then
-			prototypes[$1] = 'NOT FOUND'
-		end
+			if /typedef\s[0-9|a-z|A-Z|_]+\s\(APIENTRYP\s([0-9|a-z|A-Z|_]+)/ =~ line then
+				prototypes[$1] = 'NOT FOUND'
+			end
+		}
 	}
-}
+	puts "[glcp] parsed #{functions.size} functions and #{prototypes.size} prototypes"
 
-#
-functions.each{|function,version|
-	name = 'PFN' + function.upcase + 'PROC';
-	raise 'function type not found ' + function if prototypes[name] == nil
-	prototypes[name] = function
-}
+	log_stage('matching functions to PFN prototypes')
+	functions.each{|function,version|
+		name = 'PFN' + function.upcase + 'PROC';
+		raise 'function type not found ' + function if prototypes[name] == nil
+		prototypes[name] = function
+	}
+	puts "[glcp] matched #{functions.size} functions to prototypes"
 
-File.open('glcp/glcp.c', 'w'){|file|
-	file.puts HEADER
-	file.puts '#include "glcp.h"'
+	log_stage('writing glcp/glcp.c')
+	File.open('glcp/glcp.c', 'w'){|file|
+		file.puts HEADER
+		file.puts '#include "glcp.h"'
 
 	################################################################################
-	# 関数ポインター変数を出力
+	# Output function pointer variables
 	################################################################################
 	last_output_version = ''
 	prototypes.each{|prototype, function|
@@ -111,7 +201,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	end
 =begin
 	################################################################################
-	# 関数を出力
+	# Output function wrappers
 	################################################################################
 	last_output_version = ''
 	prototypes.each{|prototype, function|
@@ -139,7 +229,7 @@ File.open('glcp/glcp.c', 'w'){|file|
 	end
 =end
 	################################################################################
-	# 初期化関数を出力
+	# Output initialization function
 	################################################################################
 	file.puts 'void glcpInitialize()'
 	file.puts '{'
@@ -161,35 +251,38 @@ File.open('glcp/glcp.c', 'w'){|file|
 	file.puts '}'
 
 	################################################################################
-	# 終了関数を出力
+	# Output finalization function
 	################################################################################
 	file.puts 'void glcpFinalize()'
 	file.puts '{'
-	file.puts '}'
-}
+		file.puts '}'
+	}
+	puts '[glcp] wrote glcp/glcp.c'
 
-open("gl/glcorearb.h") {|source|
-	open("glcp/glcp.h", "w") {|dest|
-		dest.puts HEADER
-		dest.puts '#if !defined(___GL_CORE_PROFILE_H___)'
-		dest.puts '#define ___GL_CORE_PROFILE_H___'
-		dest.puts '#include <windows.h>'
-		dest.puts '#include <gl/gl.h>'
-		dest.puts '#if defined(GL_VERSION_1_1) && !defined(GL_VERSION_1_0)'
-		dest.puts '#define GL_VERSION_1_0'
-		dest.puts '#endif'
-		dest.puts '#if defined(__glext_h_)'
-		dest.puts '#error glext.h included before glcp.h'
-		dest.puts '#endif'
-		dest.puts '#if defined(__wglext_h_)'
-		dest.puts '#error wglext.h included before glcp.h'
-		dest.puts '#endif'
-		dest.puts '#if defined(__glxext_h_)'
-		dest.puts '#error glxext.h included before glcp.h'
-		dest.puts '#endif'
+	log_stage('writing glcp/glcp.h')
+	open("gl/glcorearb.h") {|source|
+		open("glcp/glcp.h", "w") {|dest|
+			dest.puts HEADER
+			dest.puts '#if !defined(___GL_CORE_PROFILE_H___)'
+			dest.puts '#define ___GL_CORE_PROFILE_H___'
+			dest.puts '#include <KHR/khrplatform.h>'
+			dest.puts '#include <windows.h>'
+			dest.puts '#include <GL/gl.h>'
+			dest.puts '#if defined(GL_VERSION_1_1) && !defined(GL_VERSION_1_0)'
+			dest.puts '#define GL_VERSION_1_0'
+			dest.puts '#endif'
+			dest.puts '#if defined(__glext_h_)'
+			dest.puts '#error glext.h included before glcp.h'
+			dest.puts '#endif'
+			dest.puts '#if defined(__wglext_h_)'
+			dest.puts '#error wglext.h included before glcp.h'
+			dest.puts '#endif'
+			dest.puts '#if defined(__glxext_h_)'
+			dest.puts '#error glxext.h included before glcp.h'
+			dest.puts '#endif'
 
 		################################################################################
-		# バージョンシンボルを出力
+		# Output version symbols
 		################################################################################
 		last_output_version = ''
 		functions.each{|function, version|
@@ -205,7 +298,7 @@ open("gl/glcorearb.h") {|source|
 		end
 
 		################################################################################
-		# glcorearb.hを出力
+		# Embed glcorearb.h contents
 		################################################################################
 		dest.puts '/* <-- glcorearb.h */'
 		dest.write(source.read)
@@ -215,7 +308,7 @@ open("gl/glcorearb.h") {|source|
 		dest.puts '#endif'
 #=begin
 		################################################################################
-		# 関数ポインター変数を出力
+		# Output function pointer variables
 		################################################################################
 		last_output_version = ''
 		prototypes.each{|prototype, function|
@@ -232,15 +325,24 @@ open("gl/glcorearb.h") {|source|
 		end
 #=end
 		################################################################################
-		# プロトタイプ宣言を出力
+		# Output prototype declarations
 		################################################################################
 		dest.puts 'extern void glcpInitialize();'
 		dest.puts 'extern void glcpFinalize();'
 		dest.puts '#if defined(__cplusplus)'
 		dest.puts '}'
 		dest.puts '#endif'
-		dest.puts '#endif /*___GL_CORE_PROFILE_H___*/'
+			dest.puts '#endif /*___GL_CORE_PROFILE_H___*/'
+		}
 	}
-}
+	puts '[glcp] wrote glcp/glcp.h'
 
-puts 'done.'
+	run_build_check
+
+	log_stage('completed successfully')
+	puts 'done.'
+rescue => e
+	puts "[glcp] failed during #{CURRENT_STAGE[:name]}: #{e.class}: #{e.message}"
+	puts e.backtrace.map{|line| "[glcp] #{line}"}
+	raise
+end
