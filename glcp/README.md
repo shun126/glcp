@@ -1,25 +1,28 @@
 # glcp Usage Guide
 
-`glcp.c` and `glcp.h` are the runtime loader portion of the `glcp` project. They provide generated OpenGL core-profile declarations together with function loading for projects that use WGL on Windows.
+`glcp.c` / `glcp.h` are the Core Profile runtime loader portion of the `glcp` project. `glcp_compat.c` / `glcp_compat.h` provide a legacy-friendly loader for legacy OpenGL usage on Windows, Linux, and macOS.
 
 ## What this provides
 
-- OpenGL declarations generated from Khronos `glcorearb.h`
-- Function pointer definitions in `glcp.c`
-- Runtime resolution in `glcpInitialize()` through `wglGetProcAddress`
-- `glcpFinalize()` as a cleanup hook
+- Core Profile declarations generated from Khronos `external/gl/glcorearb.h`
+- Legacy/compatibility-style loader declarations that rely on platform `gl.h` for OpenGL 1.0/1.1 and load 1.2+ dynamically
+- Runtime resolution in `glcpInitialize()` and `glcpCompatInitialize()` through platform-specific Desktop OpenGL loaders
+- `glcpFinalize()` and `glcpCompatFinalize()` as cleanup hooks
 
 ## Platform notes
 
 - The repository generation workflow can run outside Windows, including Linux environments.
-- The generated loader itself currently targets Windows runtime integration through `windows.h` and `wglGetProcAddress`.
+- The generated loaders target Desktop OpenGL on Windows, Linux, and macOS.
+- iOS and Android are not supported by this generator because they typically use OpenGL ES rather than Desktop OpenGL Core.
 
 ## Integration steps
 
 1. Add these files to your project:
    - `glcp/glcp.h`
    - `glcp/glcp.c`
-2. Include the header in a translation unit where you initialize OpenGL:
+   - `glcp/glcp_compat.h`
+   - `glcp/glcp_compat.c`
+2. Include the header that matches your target profile in a translation unit where you initialize OpenGL:
 
 ```cpp
 #include "glcp/glcp.h"
@@ -27,11 +30,13 @@
 ```
 
 3. Create and make current a valid OpenGL rendering context.
-4. Call `glcpInitialize()` after the context is current.
-5. Use OpenGL core-profile APIs through the loaded function pointers.
-6. Optionally call `glcpFinalize()` before application shutdown.
+4. Call `glcpInitialize()` for Core Profile or `glcpCompatInitialize()` for legacy/compatibility-style usage after the context is current.
+5. Use the matching OpenGL API surface through the loaded entry points.
+6. Optionally call the matching finalize function before application shutdown.
 
 ## Minimal example
+
+### Windows:
 
 ```cpp
 #include "glcp/glcp.h"
@@ -50,17 +55,64 @@ void InitGL(HDC dc)
 }
 ```
 
+### Linux (GLX):
+
+```cpp
+#include "glcp/glcp.h"
+
+void InitGL(Display* display, GLXDrawable drawable, GLXContext context)
+{
+    glXMakeCurrent(display, drawable, context);
+
+    glcpInitialize();
+
+    // Example: call loaded OpenGL functions here.
+
+    glcpFinalize();
+}
+```
+
+### macOS:
+
+```cpp
+#include "glcp/glcp.h"
+
+void InitGL(NSOpenGLContext* context)
+{
+    [context makeCurrentContext];
+
+    glcpInitialize();
+
+    // Example: call loaded OpenGL functions here.
+
+    glcpFinalize();
+}
+```
+
+### Compatibility example:
+
+```cpp
+#include "glcp/glcp_compat.h"
+
+void InitCompatGL()
+{
+    glcpCompatInitialize();
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPopAttrib();
+    glcpCompatFinalize();
+}
+```
+
+On macOS, use `NSOpenGLProfileVersionLegacy` with `glcp_compat`. Apple deprecated OpenGL on macOS 10.14, but the legacy profile is still the relevant mode for fixed-function style code.
+
 ## Important notes
 
-- `glcpInitialize()` must run on a thread with a current OpenGL context.
-- If you recreate the context, call `glcpInitialize()` again.
+- `glcpInitialize()` and `glcpCompatInitialize()` must run on a thread with a current Desktop OpenGL context.
+- If you recreate the context, call the matching initialize function again.
 - Supported OpenGL and `glcp` versions are documented in the repository root `README.md` and `CHANGELOG.md`.
 
 ## Tooltips
 
-- **Initialize timing**: "Call `glcpInitialize()` only after `wglMakeCurrent` succeeds."
-- **Context lifecycle**: "If the OpenGL context changes, re-run `glcpInitialize()`."
-- **Runtime scope**: "This generated loader currently uses WGL for Windows OpenGL contexts."
-
----
-Shun Moriya http://mnu.sakura.ne.jp
+- **Initialize timing**: "Call `glcpInitialize()` or `glcpCompatInitialize()` only after a Desktop OpenGL context becomes current."
+- **Context lifecycle**: "If the OpenGL context changes, re-run the matching initialize function."
+- **Runtime scope**: "These generated loaders target Desktop OpenGL on Windows, Linux, and macOS."

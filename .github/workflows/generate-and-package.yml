@@ -2,14 +2,14 @@ name: Generate glcp and Release
 
 on:
   workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Create a Release even when tracked changes are not detected'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 3 * * 1'
-  push:
-    paths:
-      - 'gl/glcorearb.h'
-      - 'glcp.rb'
-      - '.github/workflows/generate-and-package.yml'
-      - '.github/scripts/**'
 
 concurrency:
   group: generate-and-release-${{ github.ref_name }}
@@ -18,10 +18,16 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    env:
-      GLCP_BUILD_CHECK_REQUIRED: '1'
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+      force_release_requested: ${{ steps.release_mode.outputs.force_release_requested }}
+      major: ${{ steps.version.outputs.major }}
+      minor: ${{ steps.version.outputs.minor }}
+      patch: ${{ steps.version.outputs.patch }}
+      glcp_version: ${{ steps.version.outputs.glcp_version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,10 +39,10 @@ jobs:
         with:
           ruby-version: '3.3'
 
-      - name: Install build tools
+      - name: Install generate sanity-check dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64 zip
+          sudo apt-get install -y libgl1-mesa-dev
 
       - name: Download latest glcorearb.h
         run: bash .github/scripts/generate_from_registry.sh
@@ -50,7 +56,7 @@ jobs:
 
           version_info="$(ruby - <<'RUBY'
           versions = []
-          File.foreach('gl/glcorearb.h') do |line|
+          File.foreach('external/gl/glcorearb.h') do |line|
             if /#ifndef\sGL_VERSION_([0-9]+)_([0-9]+)/ =~ line
               versions << [$1.to_i, $2.to_i]
             end
@@ -93,7 +99,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('gl/glcorearb.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h')]
+          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('external/gl/glcorearb.h'), Path('external/KHR/khrplatform.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h'), Path('glcp/glcp_compat.c'), Path('glcp/glcp_compat.h')]
           for p in targets:
               if not p.exists():
                   continue
@@ -107,41 +113,286 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files=(gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md)
+          files=(external/gl/glcorearb.h external/KHR/khrplatform.h glcp/glcp.c glcp/glcp.h glcp/glcp_compat.c glcp/glcp_compat.h CHANGELOG.md)
           if git diff --quiet -- "${files[@]}"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Detect force release request
+        id: release_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          force_release_requested=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force_release }}" = "true" ]; then
+            force_release_requested=true
+          fi
+          echo "force_release_requested=${force_release_requested}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload generated sources artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-sources
+          path: |
+            glcp/glcp.c
+            glcp/glcp.h
+            glcp/glcp_compat.c
+            glcp/glcp_compat.h
+            CHANGELOG.md
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev xvfb xauth cmake
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Compile glcp.c on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          "$linux_cc" -c -I. -o /dev/null glcp/glcp.c
+
+      - name: Compile glcp_compat.c on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          "$linux_cc" -c -I. -o /dev/null glcp/glcp_compat.c
+
+      - name: Compile include-only header check on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          header_check="$tmpdir/glcp_header_check.c"
+          printf '#include "glcp/glcp.h"\n' > "$header_check"
+          "$linux_cc" -c -I. -o /dev/null "$header_check"
+
+      - name: Configure smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a ctest --test-dir build-tests --output-on-failure -C Release
+
+  build-windows:
+    runs-on: windows-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Compile glcp.c on Windows
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_windows.obj'
+          cl /nologo /c /I. /Fo$out glcp\glcp.c
+
+      - name: Compile glcp_compat.c on Windows
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_compat_windows.obj'
+          cl /nologo /c /I. /Fo$out glcp\glcp_compat.c
+
+      - name: Compile include-only header check on Windows
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:RUNNER_TEMP 'glcp_header_check.c'
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_header_windows.obj'
+          Set-Content -Path $src -Value '#include "glcp/glcp.h"'
+          cl /nologo /c /I. /Fo$out $src
+
+      - name: Configure smoke tests on Windows
+        shell: pwsh
+        run: |
+          cmake -S . -B build-tests
+
+      - name: Build smoke tests on Windows
+        shell: pwsh
+        run: |
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on Windows
+        shell: pwsh
+        run: |
+          ctest --test-dir build-tests --output-on-failure -C Release
+
+  build-macos:
+    runs-on: macos-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Ensure CMake is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --version
+
+      - name: Compile glcp.c on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -c -I. -o /dev/null glcp/glcp.c
+
+      - name: Compile glcp_compat.c on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -c -I. -o /dev/null glcp/glcp_compat.c
+
+      - name: Compile include-only header check on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          header_check="$tmpdir/glcp_header_check.c"
+          printf '#include "glcp/glcp.h"\n' > "$header_check"
+          clang -c -I. -o /dev/null "$header_check"
+
+      - name: Configure smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build-tests --output-on-failure -C Release
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - generate
+      - build-linux
+      - build-windows
+      - build-macos
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install release dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
       - name: Build distribution archive
-        if: steps.changes.outputs.changed == 'true'
+        if: needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true'
+        env:
+          GLCP_VERSION: ${{ needs.generate.outputs.glcp_version }}
         run: bash .github/scripts/package_dist.sh
 
       - name: Upload distribution artifact
-        if: steps.changes.outputs.changed == 'true'
+        if: needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: glcp-dist
           path: dist/*.zip
 
       - name: Commit generated files
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        if: needs.generate.outputs.changed == 'true' && github.event_name != 'push'
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gl/glcorearb.h glcp/glcp.c glcp/glcp.h CHANGELOG.md
-          git commit -m "chore: release glcp ${{ steps.version.outputs.glcp_version }}"
+          git add external/gl/glcorearb.h external/KHR/khrplatform.h glcp/glcp.c glcp/glcp.h glcp/glcp_compat.c glcp/glcp_compat.h CHANGELOG.md
+          git commit -m "chore: release glcp ${{ needs.generate.outputs.glcp_version }}"
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Verify release tag is unused
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        if: (needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true') && github.event_name != 'push'
         shell: bash
         run: |
           set -euo pipefail
-          tag_name="${{ steps.version.outputs.tag_name }}"
+          tag_name="${{ needs.generate.outputs.tag_name }}"
           if git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null; then
             echo "Tag ${tag_name} already exists locally." >&2
             exit 1
@@ -152,13 +403,28 @@ jobs:
           fi
 
       - name: Prepare release notes
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        if: (needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true') && github.event_name != 'push'
         id: notes
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          
+          changed = "${{ needs.generate.outputs.changed }}" == "true"
+          force_release_requested = "${{ needs.generate.outputs.force_release_requested }}" == "true"
+          version = "${{ needs.generate.outputs.glcp_version }}"
+          supported_gl = "${{ needs.generate.outputs.major }}.${{ needs.generate.outputs.minor }}"
+
+          if force_release_requested and not changed:
+              body = (
+                  f"## version {version}\n"
+                  "- Tracked release files were unchanged for this manual run.\n"
+                  "- Repackaged the current generated `glcp` sources into a new patch release.\n"
+                  f"- Supported OpenGL version: `{supported_gl}`."
+              )
+              Path('release-notes.md').write_text(body + '\n', encoding='utf-8', newline='\n')
+              raise SystemExit(0)
 
           changelog = Path('CHANGELOG.md').read_text(encoding='utf-8', errors='replace').replace('\r\n', '\n').replace('\r', '\n')
           lines = changelog.split('\n')
@@ -175,12 +441,11 @@ jobs:
           if entry:
               body = '\n'.join(entry).strip()
           else:
-              version = "${{ steps.version.outputs.glcp_version }}"
               body = (
                   f"## version {version}\n"
-                  "- Updated `gl/glcorearb.h` from OpenGL Registry.\n"
-                  "- Regenerated `glcp/glcp.c` and `glcp/glcp.h`.\n"
-                  f"- Supported OpenGL version: `${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}`."
+                  "- Updated `external/gl/glcorearb.h` from OpenGL Registry.\n"
+                  "- Regenerated `glcp/glcp.c`, `glcp/glcp.h`, `glcp/glcp_compat.c`, and `glcp/glcp_compat.h`.\n"
+                  f"- Supported OpenGL version: `{supported_gl}`."
               )
 
           Path('release-notes.md').write_text(body + '\n', encoding='utf-8', newline='\n')
@@ -188,20 +453,20 @@ jobs:
           echo "path=release-notes.md" >> "$GITHUB_OUTPUT"
 
       - name: Create tag
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        if: (needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true') && github.event_name != 'push'
         shell: bash
         run: |
           set -euo pipefail
-          git tag "${{ steps.version.outputs.tag_name }}"
-          git push origin "${{ steps.version.outputs.tag_name }}"
+          git tag "${{ needs.generate.outputs.tag_name }}"
+          git push origin "${{ needs.generate.outputs.tag_name }}"
 
       - name: Create GitHub release
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'push'
+        if: (needs.generate.outputs.changed == 'true' || needs.generate.outputs.force_release_requested == 'true') && github.event_name != 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "${{ steps.version.outputs.tag_name }}" dist/*.zip \
-            --title "glcp ${{ steps.version.outputs.glcp_version }}" \
+          gh release create "${{ needs.generate.outputs.tag_name }}" dist/*.zip \
+            --title "glcp ${{ needs.generate.outputs.glcp_version }}" \
             --notes-file "${{ steps.notes.outputs.path }}"

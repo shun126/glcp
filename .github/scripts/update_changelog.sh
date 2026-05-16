@@ -8,7 +8,7 @@ if [ -z "$glcp_version" ]; then
 fi
 
 header="## version ${glcp_version}"
-body="- Updated \`gl/glcorearb.h\` from OpenGL Registry and regenerated \`glcp/glcp.c\` and \`glcp/glcp.h\`."
+body="- Updated \`gl/glcorearb.h\` from OpenGL Registry and regenerated \`glcp/glcp.c\`, \`glcp/glcp.h\`, \`glcp/glcp_compat.c\`, and \`glcp/glcp_compat.h\`."
 
 python3 - "$header" "$body" <<'PY'
 from pathlib import Path

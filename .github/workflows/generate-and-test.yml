@@ -1,0 +1,258 @@
+name: Generate glcp and Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'external/gl/glcorearb.h'
+      - 'external/KHR/**'
+      - 'glcp.rb'
+      - '.github/workflows/generate-and-test.yml'
+      - '.github/scripts/**'
+
+concurrency:
+  group: generate-and-test-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install generate sanity-check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev
+
+      - name: Download latest glcorearb.h
+        run: bash .github/scripts/generate_from_registry.sh
+
+      - name: Generate glcp sources
+        run: ruby glcp.rb
+
+      - name: Normalize text files to UTF-8 + CRLF
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          targets = [Path('README.md'), Path('LICENSE.txt'), Path('CHANGELOG.md'), Path('external/gl/glcorearb.h'), Path('external/KHR/khrplatform.h'), Path('glcp/glcp.c'), Path('glcp/glcp.h'), Path('glcp/glcp_compat.c'), Path('glcp/glcp_compat.h')]
+          for p in targets:
+              if not p.exists():
+                  continue
+              text = p.read_text(encoding='utf-8', errors='replace')
+              text = text.replace('\r\n', '\n').replace('\r', '\n')
+              p.write_text(text.replace('\n', '\r\n'), encoding='utf-8', newline='')
+          PY
+
+      - name: Upload generated sources artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-sources
+          path: |
+            glcp/glcp.c
+            glcp/glcp.h
+            glcp/glcp_compat.c
+            glcp/glcp_compat.h
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev xvfb xauth cmake
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Compile glcp.c on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          "$linux_cc" -c -I. -o /dev/null glcp/glcp.c
+
+      - name: Compile glcp_compat.c on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          "$linux_cc" -c -I. -o /dev/null glcp/glcp_compat.c
+
+      - name: Compile include-only header check on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          linux_cc="${CC:-gcc}"
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            linux_cc=clang
+          fi
+          if ! command -v "$linux_cc" >/dev/null 2>&1; then
+            echo "No Linux C compiler found." >&2
+            exit 1
+          fi
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          header_check="$tmpdir/glcp_header_check.c"
+          printf '#include "glcp/glcp.h"\n' > "$header_check"
+          "$linux_cc" -c -I. -o /dev/null "$header_check"
+
+      - name: Configure smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a ctest --test-dir build-tests --output-on-failure -C Release
+
+  build-windows:
+    runs-on: windows-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Compile glcp.c on Windows
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_windows.obj'
+          cl /nologo /c /I. /Fo$out glcp\glcp.c
+
+      - name: Compile glcp_compat.c on Windows
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_compat_windows.obj'
+          cl /nologo /c /I. /Fo$out glcp\glcp_compat.c
+
+      - name: Compile include-only header check on Windows
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:RUNNER_TEMP 'glcp_header_check.c'
+          $out = Join-Path $env:RUNNER_TEMP 'glcp_header_windows.obj'
+          Set-Content -Path $src -Value '#include "glcp/glcp.h"'
+          cl /nologo /c /I. /Fo$out $src
+
+      - name: Configure smoke tests on Windows
+        shell: pwsh
+        run: |
+          cmake -S . -B build-tests
+
+      - name: Build smoke tests on Windows
+        shell: pwsh
+        run: |
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on Windows
+        shell: pwsh
+        run: |
+          ctest --test-dir build-tests --output-on-failure -C Release
+
+  build-macos:
+    runs-on: macos-latest
+    needs: generate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download generated sources artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-sources
+          path: .
+
+      - name: Ensure CMake is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --version
+
+      - name: Compile glcp.c on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -c -I. -o /dev/null glcp/glcp.c
+
+      - name: Compile glcp_compat.c on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -c -I. -o /dev/null glcp/glcp_compat.c
+
+      - name: Compile include-only header check on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          header_check="$tmpdir/glcp_header_check.c"
+          printf '#include "glcp/glcp.h"\n' > "$header_check"
+          clang -c -I. -o /dev/null "$header_check"
+
+      - name: Configure smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build-tests --config Release
+
+      - name: Run smoke tests on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build-tests --output-on-failure -C Release
