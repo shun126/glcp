@@ -22,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-05-16 15:37:56
+ * generate from glcp.rb at 2026-05-16 18:29:38
  */
 
 #if !defined(___GL_CORE_PROFILE_H___)

@@ -22,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-05-16 15:37:56
+ * generate from glcp.rb at 2026-05-16 18:29:38
  */
 
 #if !defined(___GL_COMPAT_PROFILE_H___)
@@ -58,6 +58,29 @@
 #endif
 #ifdef GL_GLEXT_PROTOTYPES
 #undef GL_GLEXT_PROTOTYPES
+#endif
+#define GLCP_GL_VERSION_1_2 1
+#define GLCP_GL_VERSION_1_3 1
+#define GLCP_GL_VERSION_1_4 1
+#define GLCP_GL_VERSION_1_5 1
+#define GLCP_GL_VERSION_2_0 1
+#define GLCP_GL_VERSION_2_1 1
+#define GLCP_GL_VERSION_3_0 1
+#define GLCP_GL_VERSION_3_1 1
+#define GLCP_GL_VERSION_3_2 1
+#define GLCP_GL_VERSION_3_3 1
+#define GLCP_GL_VERSION_4_0 1
+#define GLCP_GL_VERSION_4_1 1
+#define GLCP_GL_VERSION_4_2 1
+#define GLCP_GL_VERSION_4_3 1
+#define GLCP_GL_VERSION_4_4 1
+#define GLCP_GL_VERSION_4_5 1
+#define GLCP_GL_VERSION_4_6 1
+#if defined(_WIN32)
+#define GLCP_GL_VERSION_1_0 1
+#endif
+#if defined(_WIN32)
+#define GLCP_GL_VERSION_1_1 1
 #endif
 #if defined(_WIN32)
 #define GLCP_GL_VERSION_1_2 1
