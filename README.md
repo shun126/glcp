@@ -189,10 +189,10 @@ This repository includes GitHub Actions automation to regenerate sources, packag
 
 <a href="https://www.star-history.com/?repos=shun126%2Fglcp&type=timeline&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shun126/glcp&type=timeline&legend=bottom-right" />
  </picture>
 </a>
 
-If this project helps your Unreal Engine development, please consider giving it a star⭐.
+If this project helps your development, please consider giving it a star⭐.
