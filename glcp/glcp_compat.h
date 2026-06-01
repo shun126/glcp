@@ -1,6 +1,6 @@
 /*
  * glcp
- * version 4.6.2
+ * version 4.6.3
  * supported OpenGL version 4.6
  *
  * The zlib/libpng License
@@ -22,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-05-25 07:20:29
+ * generate from glcp.rb at 2026-06-01 08:40:37
  */
 
 #if !defined(___GL_COMPAT_PROFILE_H___)
