@@ -407,7 +407,7 @@ jobs:
           path: dist/*.zip
 
       - name: Commit generated files
-        if: needs.generate.outputs.changed == 'true' && needs.generate.outputs.glcorearb_version_changed == 'true' && github.event_name != 'push'
+        if: needs.generate.outputs.changed == 'true' && (needs.generate.outputs.glcorearb_version_changed == 'true' || needs.generate.outputs.force_release_requested == 'true') && github.event_name != 'push'
         shell: bash
         run: |
           set -euo pipefail
@@ -443,13 +443,19 @@ jobs:
           
           changed = "${{ needs.generate.outputs.changed }}" == "true"
           force_release_requested = "${{ needs.generate.outputs.force_release_requested }}" == "true"
+          glcorearb_version_changed = "${{ needs.generate.outputs.glcorearb_version_changed }}" == "true"
           version = "${{ needs.generate.outputs.glcp_version }}"
           supported_gl = "${{ needs.generate.outputs.major }}.${{ needs.generate.outputs.minor }}"
 
-          if force_release_requested and not changed:
+          if force_release_requested and not glcorearb_version_changed:
+              change_note = (
+                  "- Regenerated release files for this manual run and committed the updated patch version."
+                  if changed else
+                  "- Tracked release files were unchanged for this manual run."
+              )
               body = (
                   f"## version {version}\n"
-                  "- Tracked release files were unchanged for this manual run.\n"
+                  f"{change_note}\n"
                   "- Repackaged the current generated `glcp` sources into a new patch release.\n"
                   f"- Supported OpenGL version: `{supported_gl}`."
               )
