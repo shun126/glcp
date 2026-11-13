@@ -21,9 +21,17 @@ int main(void)
 
 	TEST_ASSERT(glcp_test_win_create_context(&context));
 	create_context = (glcp_test_create_context_attribs_proc)wglGetProcAddress("wglCreateContextAttribsARB");
-	TEST_ASSERT(create_context != NULL);
+	if (create_context == NULL) {
+		printf("SKIP: WGL_ARB_create_context is unavailable; OpenGL 3.3 Core is required.\n");
+		glcp_test_win_destroy_context(&context);
+		return 77;
+	}
 	core_context = create_context(context.device_context, NULL, attributes);
-	TEST_ASSERT(core_context != NULL);
+	if (core_context == NULL) {
+		printf("SKIP: the driver cannot create an OpenGL 3.3 Core context.\n");
+		glcp_test_win_destroy_context(&context);
+		return 77;
+	}
 	TEST_ASSERT(wglMakeCurrent(context.device_context, core_context));
 	TEST_ASSERT(wglDeleteContext(context.rendering_context));
 	context.rendering_context = core_context;

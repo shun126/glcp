@@ -14,6 +14,7 @@
 - `win/`
   - Creates a WGL context on Windows and runs the core / compat runtime tests.
   - `core_strings_win.c` requests a 3.3 Core context and checks `glGetString`, `glGetStringi`, and their NULL reset after finalize.
+    CTest reports this test as skipped (exit code 77) when the driver cannot provide the required context, including Windows CI runners without `WGL_ARB_create_context`.
 - `macos/`
   - Creates a CGL context on macOS and runs the core / legacy runtime tests.
 - `glx/`

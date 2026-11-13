@@ -7,6 +7,9 @@ on:
       - 'external/gl/glcorearb.h'
       - 'external/KHR/**'
       - 'glcp.rb'
+      - 'glcp/**'
+      - 'CMakeLists.txt'
+      - 'tests/**'
       - '.github/workflows/generate-and-test.yml'
       - '.github/scripts/**'
 
