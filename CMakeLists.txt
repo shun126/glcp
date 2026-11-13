@@ -144,6 +144,8 @@ glcp_add_generated_validation_test(
 )
 
 if(WIN32)
+  glcp_add_runtime_smoke(glcp_core_strings_win "${CMAKE_SOURCE_DIR}/tests/win/core_strings_win.c" "${CMAKE_SOURCE_DIR}/glcp/glcp.c")
+  set_tests_properties(glcp_core_strings_win PROPERTIES SKIP_RETURN_CODE 77)
   glcp_add_runtime_smoke(glcp_core_runtime_win "${CMAKE_SOURCE_DIR}/tests/win/core_runtime_win.c" "${CMAKE_SOURCE_DIR}/glcp/glcp.c")
   glcp_add_runtime_smoke(glcp_compat_runtime_win "${CMAKE_SOURCE_DIR}/tests/win/compat_runtime_win.c" "${CMAKE_SOURCE_DIR}/glcp/glcp_compat.c")
 elseif(APPLE)

@@ -1,6 +1,6 @@
 /*
  * glcp
- * version 4.6.6
+ * version 4.6.7
  * supported OpenGL version 4.6
  *
  * The zlib/libpng License
@@ -22,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-06-22 09:16:09
+ * generate from glcp.rb at 2026-11-13 14:47:06
  */
 
 #if !defined(___GL_COMPAT_PROFILE_H___)
@@ -6277,6 +6277,7 @@ extern PFNGLISBUFFERPROC glIsBuffer;
 extern PFNGLBUFFERDATAPROC glBufferData;
 extern PFNGLBUFFERSUBDATAPROC glBufferSubData;
 extern PFNGLGETBUFFERSUBDATAPROC glGetBufferSubData;
+extern PFNGLMAPBUFFERPROC glMapBuffer;
 extern PFNGLUNMAPBUFFERPROC glUnmapBuffer;
 extern PFNGLGETBUFFERPARAMETERIVPROC glGetBufferParameteriv;
 extern PFNGLGETBUFFERPOINTERVPROC glGetBufferPointerv;
@@ -6442,6 +6443,7 @@ extern PFNGLCLEARBUFFERIVPROC glClearBufferiv;
 extern PFNGLCLEARBUFFERUIVPROC glClearBufferuiv;
 extern PFNGLCLEARBUFFERFVPROC glClearBufferfv;
 extern PFNGLCLEARBUFFERFIPROC glClearBufferfi;
+extern PFNGLGETSTRINGIPROC glGetStringi;
 extern PFNGLISRENDERBUFFERPROC glIsRenderbuffer;
 extern PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer;
 extern PFNGLDELETERENDERBUFFERSPROC glDeleteRenderbuffers;
@@ -6462,6 +6464,7 @@ extern PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
 extern PFNGLBLITFRAMEBUFFERPROC glBlitFramebuffer;
 extern PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC glRenderbufferStorageMultisample;
 extern PFNGLFRAMEBUFFERTEXTURELAYERPROC glFramebufferTextureLayer;
+extern PFNGLMAPBUFFERRANGEPROC glMapBufferRange;
 extern PFNGLFLUSHMAPPEDBUFFERRANGEPROC glFlushMappedBufferRange;
 extern PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
 extern PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
@@ -6756,6 +6759,8 @@ extern PFNGLNAMEDBUFFERSUBDATAPROC glNamedBufferSubData;
 extern PFNGLCOPYNAMEDBUFFERSUBDATAPROC glCopyNamedBufferSubData;
 extern PFNGLCLEARNAMEDBUFFERDATAPROC glClearNamedBufferData;
 extern PFNGLCLEARNAMEDBUFFERSUBDATAPROC glClearNamedBufferSubData;
+extern PFNGLMAPNAMEDBUFFERPROC glMapNamedBuffer;
+extern PFNGLMAPNAMEDBUFFERRANGEPROC glMapNamedBufferRange;
 extern PFNGLUNMAPNAMEDBUFFERPROC glUnmapNamedBuffer;
 extern PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEPROC glFlushMappedNamedBufferRange;
 extern PFNGLGETNAMEDBUFFERPARAMETERIVPROC glGetNamedBufferParameteriv;
@@ -7081,6 +7086,7 @@ extern PFNGLMATRIXMULTTRANSPOSEFEXTPROC glMatrixMultTransposefEXT;
 extern PFNGLMATRIXMULTTRANSPOSEDEXTPROC glMatrixMultTransposedEXT;
 extern PFNGLNAMEDBUFFERDATAEXTPROC glNamedBufferDataEXT;
 extern PFNGLNAMEDBUFFERSUBDATAEXTPROC glNamedBufferSubDataEXT;
+extern PFNGLMAPNAMEDBUFFEREXTPROC glMapNamedBufferEXT;
 extern PFNGLUNMAPNAMEDBUFFEREXTPROC glUnmapNamedBufferEXT;
 extern PFNGLGETNAMEDBUFFERPARAMETERIVEXTPROC glGetNamedBufferParameterivEXT;
 extern PFNGLGETNAMEDBUFFERPOINTERVEXTPROC glGetNamedBufferPointervEXT;
@@ -7192,6 +7198,7 @@ extern PFNGLGETVERTEXARRAYINTEGERVEXTPROC glGetVertexArrayIntegervEXT;
 extern PFNGLGETVERTEXARRAYPOINTERVEXTPROC glGetVertexArrayPointervEXT;
 extern PFNGLGETVERTEXARRAYINTEGERI_VEXTPROC glGetVertexArrayIntegeri_vEXT;
 extern PFNGLGETVERTEXARRAYPOINTERI_VEXTPROC glGetVertexArrayPointeri_vEXT;
+extern PFNGLMAPNAMEDBUFFERRANGEEXTPROC glMapNamedBufferRangeEXT;
 extern PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEEXTPROC glFlushMappedNamedBufferRangeEXT;
 extern PFNGLNAMEDBUFFERSTORAGEEXTPROC glNamedBufferStorageEXT;
 extern PFNGLCLEARNAMEDBUFFERDATAEXTPROC glClearNamedBufferDataEXT;

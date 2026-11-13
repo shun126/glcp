@@ -1,6 +1,6 @@
 /*
  * glcp
- * version 4.6.6
+ * version 4.6.7
  * supported OpenGL version 4.6
  *
  * The zlib/libpng License
@@ -22,7 +22,7 @@
  *    misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  *
- * generate from glcp.rb at 2026-06-22 09:16:09
+ * generate from glcp.rb at 2026-11-13 14:47:06
  */
 
 #include "glcp.h"
@@ -124,6 +124,7 @@ PFNGLGETDOUBLEVPROC glGetDoublev = NULL;
 PFNGLGETERRORPROC glGetError = NULL;
 PFNGLGETFLOATVPROC glGetFloatv = NULL;
 PFNGLGETINTEGERVPROC glGetIntegerv = NULL;
+PFNGLGETSTRINGPROC glGetString = NULL;
 PFNGLGETTEXIMAGEPROC glGetTexImage = NULL;
 PFNGLGETTEXPARAMETERFVPROC glGetTexParameterfv = NULL;
 PFNGLGETTEXPARAMETERIVPROC glGetTexParameteriv = NULL;
@@ -193,6 +194,7 @@ PFNGLISBUFFERPROC glIsBuffer = NULL;
 PFNGLBUFFERDATAPROC glBufferData = NULL;
 PFNGLBUFFERSUBDATAPROC glBufferSubData = NULL;
 PFNGLGETBUFFERSUBDATAPROC glGetBufferSubData = NULL;
+PFNGLMAPBUFFERPROC glMapBuffer = NULL;
 PFNGLUNMAPBUFFERPROC glUnmapBuffer = NULL;
 PFNGLGETBUFFERPARAMETERIVPROC glGetBufferParameteriv = NULL;
 PFNGLGETBUFFERPOINTERVPROC glGetBufferPointerv = NULL;
@@ -358,6 +360,7 @@ PFNGLCLEARBUFFERIVPROC glClearBufferiv = NULL;
 PFNGLCLEARBUFFERUIVPROC glClearBufferuiv = NULL;
 PFNGLCLEARBUFFERFVPROC glClearBufferfv = NULL;
 PFNGLCLEARBUFFERFIPROC glClearBufferfi = NULL;
+PFNGLGETSTRINGIPROC glGetStringi = NULL;
 PFNGLISRENDERBUFFERPROC glIsRenderbuffer = NULL;
 PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer = NULL;
 PFNGLDELETERENDERBUFFERSPROC glDeleteRenderbuffers = NULL;
@@ -378,6 +381,7 @@ PFNGLGENERATEMIPMAPPROC glGenerateMipmap = NULL;
 PFNGLBLITFRAMEBUFFERPROC glBlitFramebuffer = NULL;
 PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC glRenderbufferStorageMultisample = NULL;
 PFNGLFRAMEBUFFERTEXTURELAYERPROC glFramebufferTextureLayer = NULL;
+PFNGLMAPBUFFERRANGEPROC glMapBufferRange = NULL;
 PFNGLFLUSHMAPPEDBUFFERRANGEPROC glFlushMappedBufferRange = NULL;
 PFNGLBINDVERTEXARRAYPROC glBindVertexArray = NULL;
 PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays = NULL;
@@ -672,6 +676,8 @@ PFNGLNAMEDBUFFERSUBDATAPROC glNamedBufferSubData = NULL;
 PFNGLCOPYNAMEDBUFFERSUBDATAPROC glCopyNamedBufferSubData = NULL;
 PFNGLCLEARNAMEDBUFFERDATAPROC glClearNamedBufferData = NULL;
 PFNGLCLEARNAMEDBUFFERSUBDATAPROC glClearNamedBufferSubData = NULL;
+PFNGLMAPNAMEDBUFFERPROC glMapNamedBuffer = NULL;
+PFNGLMAPNAMEDBUFFERRANGEPROC glMapNamedBufferRange = NULL;
 PFNGLUNMAPNAMEDBUFFERPROC glUnmapNamedBuffer = NULL;
 PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEPROC glFlushMappedNamedBufferRange = NULL;
 PFNGLGETNAMEDBUFFERPARAMETERIVPROC glGetNamedBufferParameteriv = NULL;
@@ -997,6 +1003,7 @@ PFNGLMATRIXMULTTRANSPOSEFEXTPROC glMatrixMultTransposefEXT = NULL;
 PFNGLMATRIXMULTTRANSPOSEDEXTPROC glMatrixMultTransposedEXT = NULL;
 PFNGLNAMEDBUFFERDATAEXTPROC glNamedBufferDataEXT = NULL;
 PFNGLNAMEDBUFFERSUBDATAEXTPROC glNamedBufferSubDataEXT = NULL;
+PFNGLMAPNAMEDBUFFEREXTPROC glMapNamedBufferEXT = NULL;
 PFNGLUNMAPNAMEDBUFFEREXTPROC glUnmapNamedBufferEXT = NULL;
 PFNGLGETNAMEDBUFFERPARAMETERIVEXTPROC glGetNamedBufferParameterivEXT = NULL;
 PFNGLGETNAMEDBUFFERPOINTERVEXTPROC glGetNamedBufferPointervEXT = NULL;
@@ -1108,6 +1115,7 @@ PFNGLGETVERTEXARRAYINTEGERVEXTPROC glGetVertexArrayIntegervEXT = NULL;
 PFNGLGETVERTEXARRAYPOINTERVEXTPROC glGetVertexArrayPointervEXT = NULL;
 PFNGLGETVERTEXARRAYINTEGERI_VEXTPROC glGetVertexArrayIntegeri_vEXT = NULL;
 PFNGLGETVERTEXARRAYPOINTERI_VEXTPROC glGetVertexArrayPointeri_vEXT = NULL;
+PFNGLMAPNAMEDBUFFERRANGEEXTPROC glMapNamedBufferRangeEXT = NULL;
 PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEEXTPROC glFlushMappedNamedBufferRangeEXT = NULL;
 PFNGLNAMEDBUFFERSTORAGEEXTPROC glNamedBufferStorageEXT = NULL;
 PFNGLCLEARNAMEDBUFFERDATAEXTPROC glClearNamedBufferDataEXT = NULL;
@@ -1443,6 +1451,7 @@ void glcpInitialize()
 	glGetError = (PFNGLGETERRORPROC)glcpGetProcAddress("glGetError");
 	glGetFloatv = (PFNGLGETFLOATVPROC)glcpGetProcAddress("glGetFloatv");
 	glGetIntegerv = (PFNGLGETINTEGERVPROC)glcpGetProcAddress("glGetIntegerv");
+	glGetString = (PFNGLGETSTRINGPROC)glcpGetProcAddress("glGetString");
 	glGetTexImage = (PFNGLGETTEXIMAGEPROC)glcpGetProcAddress("glGetTexImage");
 	glGetTexParameterfv = (PFNGLGETTEXPARAMETERFVPROC)glcpGetProcAddress("glGetTexParameterfv");
 	glGetTexParameteriv = (PFNGLGETTEXPARAMETERIVPROC)glcpGetProcAddress("glGetTexParameteriv");
@@ -1512,6 +1521,7 @@ void glcpInitialize()
 	glBufferData = (PFNGLBUFFERDATAPROC)glcpGetProcAddress("glBufferData");
 	glBufferSubData = (PFNGLBUFFERSUBDATAPROC)glcpGetProcAddress("glBufferSubData");
 	glGetBufferSubData = (PFNGLGETBUFFERSUBDATAPROC)glcpGetProcAddress("glGetBufferSubData");
+	glMapBuffer = (PFNGLMAPBUFFERPROC)glcpGetProcAddress("glMapBuffer");
 	glUnmapBuffer = (PFNGLUNMAPBUFFERPROC)glcpGetProcAddress("glUnmapBuffer");
 	glGetBufferParameteriv = (PFNGLGETBUFFERPARAMETERIVPROC)glcpGetProcAddress("glGetBufferParameteriv");
 	glGetBufferPointerv = (PFNGLGETBUFFERPOINTERVPROC)glcpGetProcAddress("glGetBufferPointerv");
@@ -1677,6 +1687,7 @@ void glcpInitialize()
 	glClearBufferuiv = (PFNGLCLEARBUFFERUIVPROC)glcpGetProcAddress("glClearBufferuiv");
 	glClearBufferfv = (PFNGLCLEARBUFFERFVPROC)glcpGetProcAddress("glClearBufferfv");
 	glClearBufferfi = (PFNGLCLEARBUFFERFIPROC)glcpGetProcAddress("glClearBufferfi");
+	glGetStringi = (PFNGLGETSTRINGIPROC)glcpGetProcAddress("glGetStringi");
 	glIsRenderbuffer = (PFNGLISRENDERBUFFERPROC)glcpGetProcAddress("glIsRenderbuffer");
 	glBindRenderbuffer = (PFNGLBINDRENDERBUFFERPROC)glcpGetProcAddress("glBindRenderbuffer");
 	glDeleteRenderbuffers = (PFNGLDELETERENDERBUFFERSPROC)glcpGetProcAddress("glDeleteRenderbuffers");
@@ -1697,6 +1708,7 @@ void glcpInitialize()
 	glBlitFramebuffer = (PFNGLBLITFRAMEBUFFERPROC)glcpGetProcAddress("glBlitFramebuffer");
 	glRenderbufferStorageMultisample = (PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC)glcpGetProcAddress("glRenderbufferStorageMultisample");
 	glFramebufferTextureLayer = (PFNGLFRAMEBUFFERTEXTURELAYERPROC)glcpGetProcAddress("glFramebufferTextureLayer");
+	glMapBufferRange = (PFNGLMAPBUFFERRANGEPROC)glcpGetProcAddress("glMapBufferRange");
 	glFlushMappedBufferRange = (PFNGLFLUSHMAPPEDBUFFERRANGEPROC)glcpGetProcAddress("glFlushMappedBufferRange");
 	glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)glcpGetProcAddress("glBindVertexArray");
 	glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)glcpGetProcAddress("glDeleteVertexArrays");
@@ -1991,6 +2003,8 @@ void glcpInitialize()
 	glCopyNamedBufferSubData = (PFNGLCOPYNAMEDBUFFERSUBDATAPROC)glcpGetProcAddress("glCopyNamedBufferSubData");
 	glClearNamedBufferData = (PFNGLCLEARNAMEDBUFFERDATAPROC)glcpGetProcAddress("glClearNamedBufferData");
 	glClearNamedBufferSubData = (PFNGLCLEARNAMEDBUFFERSUBDATAPROC)glcpGetProcAddress("glClearNamedBufferSubData");
+	glMapNamedBuffer = (PFNGLMAPNAMEDBUFFERPROC)glcpGetProcAddress("glMapNamedBuffer");
+	glMapNamedBufferRange = (PFNGLMAPNAMEDBUFFERRANGEPROC)glcpGetProcAddress("glMapNamedBufferRange");
 	glUnmapNamedBuffer = (PFNGLUNMAPNAMEDBUFFERPROC)glcpGetProcAddress("glUnmapNamedBuffer");
 	glFlushMappedNamedBufferRange = (PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEPROC)glcpGetProcAddress("glFlushMappedNamedBufferRange");
 	glGetNamedBufferParameteriv = (PFNGLGETNAMEDBUFFERPARAMETERIVPROC)glcpGetProcAddress("glGetNamedBufferParameteriv");
@@ -2316,6 +2330,7 @@ void glcpInitialize()
 	glMatrixMultTransposedEXT = (PFNGLMATRIXMULTTRANSPOSEDEXTPROC)glcpGetProcAddress("glMatrixMultTransposedEXT");
 	glNamedBufferDataEXT = (PFNGLNAMEDBUFFERDATAEXTPROC)glcpGetProcAddress("glNamedBufferDataEXT");
 	glNamedBufferSubDataEXT = (PFNGLNAMEDBUFFERSUBDATAEXTPROC)glcpGetProcAddress("glNamedBufferSubDataEXT");
+	glMapNamedBufferEXT = (PFNGLMAPNAMEDBUFFEREXTPROC)glcpGetProcAddress("glMapNamedBufferEXT");
 	glUnmapNamedBufferEXT = (PFNGLUNMAPNAMEDBUFFEREXTPROC)glcpGetProcAddress("glUnmapNamedBufferEXT");
 	glGetNamedBufferParameterivEXT = (PFNGLGETNAMEDBUFFERPARAMETERIVEXTPROC)glcpGetProcAddress("glGetNamedBufferParameterivEXT");
 	glGetNamedBufferPointervEXT = (PFNGLGETNAMEDBUFFERPOINTERVEXTPROC)glcpGetProcAddress("glGetNamedBufferPointervEXT");
@@ -2427,6 +2442,7 @@ void glcpInitialize()
 	glGetVertexArrayPointervEXT = (PFNGLGETVERTEXARRAYPOINTERVEXTPROC)glcpGetProcAddress("glGetVertexArrayPointervEXT");
 	glGetVertexArrayIntegeri_vEXT = (PFNGLGETVERTEXARRAYINTEGERI_VEXTPROC)glcpGetProcAddress("glGetVertexArrayIntegeri_vEXT");
 	glGetVertexArrayPointeri_vEXT = (PFNGLGETVERTEXARRAYPOINTERI_VEXTPROC)glcpGetProcAddress("glGetVertexArrayPointeri_vEXT");
+	glMapNamedBufferRangeEXT = (PFNGLMAPNAMEDBUFFERRANGEEXTPROC)glcpGetProcAddress("glMapNamedBufferRangeEXT");
 	glFlushMappedNamedBufferRangeEXT = (PFNGLFLUSHMAPPEDNAMEDBUFFERRANGEEXTPROC)glcpGetProcAddress("glFlushMappedNamedBufferRangeEXT");
 	glNamedBufferStorageEXT = (PFNGLNAMEDBUFFERSTORAGEEXTPROC)glcpGetProcAddress("glNamedBufferStorageEXT");
 	glClearNamedBufferDataEXT = (PFNGLCLEARNAMEDBUFFERDATAEXTPROC)glcpGetProcAddress("glClearNamedBufferDataEXT");
@@ -2763,6 +2779,7 @@ void glcpFinalize()
 	glGetError = NULL;
 	glGetFloatv = NULL;
 	glGetIntegerv = NULL;
+	glGetString = NULL;
 	glGetTexImage = NULL;
 	glGetTexParameterfv = NULL;
 	glGetTexParameteriv = NULL;
@@ -2832,6 +2849,7 @@ void glcpFinalize()
 	glBufferData = NULL;
 	glBufferSubData = NULL;
 	glGetBufferSubData = NULL;
+	glMapBuffer = NULL;
 	glUnmapBuffer = NULL;
 	glGetBufferParameteriv = NULL;
 	glGetBufferPointerv = NULL;
@@ -2997,6 +3015,7 @@ void glcpFinalize()
 	glClearBufferuiv = NULL;
 	glClearBufferfv = NULL;
 	glClearBufferfi = NULL;
+	glGetStringi = NULL;
 	glIsRenderbuffer = NULL;
 	glBindRenderbuffer = NULL;
 	glDeleteRenderbuffers = NULL;
@@ -3017,6 +3036,7 @@ void glcpFinalize()
 	glBlitFramebuffer = NULL;
 	glRenderbufferStorageMultisample = NULL;
 	glFramebufferTextureLayer = NULL;
+	glMapBufferRange = NULL;
 	glFlushMappedBufferRange = NULL;
 	glBindVertexArray = NULL;
 	glDeleteVertexArrays = NULL;
@@ -3311,6 +3331,8 @@ void glcpFinalize()
 	glCopyNamedBufferSubData = NULL;
 	glClearNamedBufferData = NULL;
 	glClearNamedBufferSubData = NULL;
+	glMapNamedBuffer = NULL;
+	glMapNamedBufferRange = NULL;
 	glUnmapNamedBuffer = NULL;
 	glFlushMappedNamedBufferRange = NULL;
 	glGetNamedBufferParameteriv = NULL;
@@ -3636,6 +3658,7 @@ void glcpFinalize()
 	glMatrixMultTransposedEXT = NULL;
 	glNamedBufferDataEXT = NULL;
 	glNamedBufferSubDataEXT = NULL;
+	glMapNamedBufferEXT = NULL;
 	glUnmapNamedBufferEXT = NULL;
 	glGetNamedBufferParameterivEXT = NULL;
 	glGetNamedBufferPointervEXT = NULL;
@@ -3747,6 +3770,7 @@ void glcpFinalize()
 	glGetVertexArrayPointervEXT = NULL;
 	glGetVertexArrayIntegeri_vEXT = NULL;
 	glGetVertexArrayPointeri_vEXT = NULL;
+	glMapNamedBufferRangeEXT = NULL;
 	glFlushMappedNamedBufferRangeEXT = NULL;
 	glNamedBufferStorageEXT = NULL;
 	glClearNamedBufferDataEXT = NULL;
