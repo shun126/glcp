@@ -22,7 +22,7 @@
 #   - Normal users are expected to consume released glcp.c / glcp.h packages
 #   - iOS and Android are out of scope because they typically use OpenGL ES
 
-DEFAULT_GLCP_RELEASE = 3
+DEFAULT_GLCP_RELEASE = 7
 GLCP_GENERATE_TIME = Time.now
 CURRENT_STAGE = { name: 'startup' }
 
@@ -433,9 +433,9 @@ begin
 				version = $1
 			end
 
-			#if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)\s(\([0-9|a-z|A-Z|_*,.\s]+\));/ =~ line then
-			if /GLAPI\s([0-9|a-z|A-Z|_]+)\sAPIENTRY\s([0-9|a-z|A-Z|_]+)/ =~ line then
-				functions[$2] = version
+			# Return types may contain qualifiers and pointers, including *APIENTRY.
+			if /^GLAPI\s+.+?\bAPIENTRY\s+(gl\w+)\s*\(/ =~ line then
+				functions[$1] = version
 =begin
 				position = line.rindex(';')
 				puts $1 + ' ' + $2 + ' ' + $3
@@ -446,7 +446,7 @@ begin
 =end
 			end
 
-			if /typedef\s[0-9|a-z|A-Z|_]+\s\(APIENTRYP\s([0-9|a-z|A-Z|_]+)/ =~ line then
+			if /^typedef\s+.+?\(\s*APIENTRYP\s+(PFN\w+PROC)\s*\)/ =~ line then
 				prototypes[$1] = 'NOT FOUND'
 			end
 		}

@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 VERSION_RE = re.compile(r"GLCP_GL_VERSION_\d+_\d+")
+HEADER_DECL_RE = re.compile(r"^GLAPI\s+.+?\bAPIENTRY\s+(gl\w+)\s*\(", re.MULTILINE)
 HEADER_EXTERN_RE = re.compile(r"^\s*extern\s+(PFNGL[A-Za-z0-9_]+PROC)\s+(gl[A-Za-z0-9_]+)\s*;")
 SOURCE_DEFINE_RE = re.compile(r"^\s*(PFNGL[A-Za-z0-9_]+PROC)\s+(gl[A-Za-z0-9_]+)\s*=\s*NULL;")
 SOURCE_INIT_RE = re.compile(
@@ -172,6 +173,13 @@ def parse_versioned_inventory(path: Path):
 
 
 def validate_loader(label: str, header: Path, source: Path, inventory: Path, versioned_inventory: Path | None):
+    header_text = header.read_text(encoding="utf-8")
+    declarations = HEADER_DECL_RE.findall(header_text)
+    externs = re.findall(r"^extern\s+PFN\w+\s+(gl\w+)\s*;", header_text, re.MULTILINE)
+    assert_equal_sets(label, "all declarations", "GLAPI declarations", set(declarations), "externs", set(externs))
+    if len(declarations) != len(externs):
+        raise AssertionError(f"{label}: GLAPI declaration and extern counts differ")
+    print(f"{label}: matched {len(declarations)} GLAPI declarations to externs")
     header_entries = parse_blocked_entries(header, HEADER_EXTERN_RE)
     source_definitions, source_initializes, source_finalizes = parse_source_sections(source)
     inventory_entries = parse_inventory(inventory)

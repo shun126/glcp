@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## version 4.6.7
+- Fixed declaration and PFN typedef parsing for pointer and const-qualified return types, restoring missing function pointers in both generated loaders.
+
 ## version 4.6.6
 - Updated `gl/glcorearb.h` from OpenGL Registry and regenerated `glcp/glcp.c`, `glcp/glcp.h`, `glcp/glcp_compat.c`, and `glcp/glcp_compat.h`.
 
